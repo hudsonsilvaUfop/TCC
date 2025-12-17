@@ -1,0 +1,16 @@
+googlemaps
+geopy
+requests
+osmnx
+folium
+geopandas
+shapely
+networkx
+matplotlib
+rtree
+cython
+openrouteservice
+scikit-learn
+pandas
+numpy
+openpyxl
