@@ -204,7 +204,6 @@ def aplicar_swap_first_random(grafo, rota):
 
         custo_novo = custo_rota(nova_rota, grafo)
         if custo_novo < custo_atual:
-            print(f"✨ FIRST: swap ({i},{j}) melhorou {custo_atual - custo_novo:.2f} m")
             return nova_rota
 
     return rota
@@ -260,7 +259,8 @@ def aplicar_simulated_annealing(grafo, rota):
 
     coletas = [(u, v) for (u, v, coleta) in rota if coleta]
     n = len(coletas)
-
+    if n < 2:
+        return rota
     while T > Config.SA_TEMPERATURA_MIN:
         for _ in range(Config.SA_ITERACOES_POR_TEMPERATURA):
             i, j = random.sample(range(n), 2)
@@ -365,7 +365,7 @@ def salvar_rotas_txt(rotas, grafo, gp, tempo_total=0):
     from pathlib import Path
 
     Path("rotas").mkdir(exist_ok=True)
-    caminho_txt = Path("rotas") / f"rotas_grasp_{gp}.txt"
+    caminho_txt = Path("rotas") / f"{Config.TAG}_rotas_grasp_{gp}.txt"
 
     linhas = []
     custo_total = 0.0
@@ -390,8 +390,6 @@ def salvar_rotas_txt(rotas, grafo, gp, tempo_total=0):
     with open(caminho_txt, "w", encoding="utf-8") as f:
         f.write("\n".join(linhas))
 
-    print(f"📄 Arquivo de rotas salvo como '{caminho_txt}'")
-
 
 def gerar_mapas(df_arestas, melhor_solucao, gp):
     """
@@ -400,7 +398,7 @@ def gerar_mapas(df_arestas, melhor_solucao, gp):
     from pathlib import Path
 
     Path("mapas").mkdir(exist_ok=True)
-    prefixo = Path("mapas") / f"mapa_grasp_{gp}"
+    prefixo = Path("mapas") / f"{Config.TAG}_mapa_grasp_{gp}"
 
     coord_por_aresta = {
         frozenset((row["id1"], row["id2"])):
@@ -436,7 +434,6 @@ def gerar_mapas(df_arestas, melhor_solucao, gp):
                     CircleMarker(location=p1, radius=4, color=cor, fill=True).add_to(mapa_total)
     LayerControl().add_to(mapa_total)
     mapa_total.save(f"{prefixo}_completo.html")
-    print(f"🗺️ Mapa completo salvo como '{prefixo}_completo.html'")
 
     for idx, (rota, carga) in enumerate(melhor_solucao, start=1):
         mapa_individual = Map(location=[centro_lat, centro_lon], zoom_start=14)
@@ -449,7 +446,6 @@ def gerar_mapas(df_arestas, melhor_solucao, gp):
                     CircleMarker(location=p1, radius=4, color=cor, fill=True).add_to(mapa_individual)
         LayerControl().add_to(mapa_individual)
         mapa_individual.save(f"{prefixo}_rota{idx}.html")
-        print(f"🗺️ Mapa da rota {idx} salvo como '{prefixo}_rota{idx}.html'")
 
 def salvar_xls(rotas, grafo, gp, tempo):
     Path("resultados_xls").mkdir(exist_ok=True)
@@ -462,7 +458,8 @@ def salvar_xls(rotas, grafo, gp, tempo):
             "distancia_m": sum(custo_aresta(grafo,u,v) for u,v,_ in rota),
             "tempo_s": tempo
         })
-    pd.DataFrame(dados).to_excel(f"resultados_xls/resultado_grasp_{gp}.xlsx", index=False)
+    tag = getattr(Config, "TAG", "c0_default")
+    pd.DataFrame(dados).to_excel(f"resultados_xls/{tag}_resultado_grasp_{gp}.xlsx", index=False)
 
 # =============================================================
 # EXECUÇÃO
@@ -482,43 +479,123 @@ def executar_grasp():
     )
 
     tempo = time.time() - inicio
-
-    gerar_mapas(df, melhor, gp)
-    salvar_rotas_txt(melhor, grafo, gp, tempo)
+    
+    exibir_cargas_rotas(melhor, Config.CAPACIDADE_CAMINHAO)
+    
+    exibir_distancias_rotas(melhor, grafo)
+    if Config.GERAR_HTML:
+        gerar_mapas(df, melhor,gp) 
+    if Config.GERAR_TXT:
+        salvar_rotas_txt(melhor, grafo, gp, tempo)
     salvar_xls(melhor, grafo, gp, tempo)
 
 def executar_grasp_para_todos():
     for i in range(1, 8):
         Config.CAMINHO_ARQUIVO = f"aresta_residuo/arestas_residuo_gp{i}.txt"
         executar_grasp()
+        
+def exibir_cargas_rotas(rotas, capacidade):
+    print("\n📦 Utilização de carga por rota:")
+    for i, (_, carga) in enumerate(rotas, start=1):
+        perc = (carga / capacidade) * 100 if capacidade > 0 else 0
+        print(f"   ↳ Rota {i}: {carga/1000:.2f} t ({perc:.1f}% da capacidade)")
 
+def exibir_distancias_rotas(rotas, grafo):
+    print("\n📏 Distâncias percorridas por rota:")
+    total = 0.0
+    for i, (rota, _) in enumerate(rotas, start=1):
+        d = sum(custo_aresta(grafo, u, v) for (u, v, _) in rota)
+        print(f"   ↳ Rota {i}: {d:,.2f} m")
+        total += d
+    print(f"📍 Distância total percorrida: {total:,.2f} m")
 # =============================================================
 # CONFIG
 # =============================================================
 
 class Config:
-    CAMINHO_ARQUIVO = "aresta_residuo/arestas_residuo_gp1.txt"
-    CAPACIDADE_CAMINHAO = 15000
-    ALFA = 0.8
-    NUM_ITERACOES_GRASP = 10
-    GERAR_HTML = True
-    GERAR_TXT = True
-    EXECUTAR_TODOS = False
-    NUM_TENTATIVAS_SWAP = 50
-    METODO_MELHORIA = "first_rand"
+    CAMINHO_ARQUIVO = None
+    CAPACIDADE_CAMINHAO = None
+    ALFA = None
+    NUM_ITERACOES_GRASP = None
+    GERAR_HTML = None
+    GERAR_TXT = None
+    EXECUTAR_TODOS = None
+    NUM_TENTATIVAS_SWAP = None
+    METODO_MELHORIA = None
 
-    SA_TEMPERATURA_INICIAL = 100
-    SA_TEMPERATURA_MIN = 0.01
-    SA_ALPHA = 0.8
-    SA_ITERACOES_POR_TEMPERATURA = 10
+    SA_TEMPERATURA_INICIAL = None
+    SA_TEMPERATURA_MIN = None
+    SA_ALPHA = None
+    SA_ITERACOES_POR_TEMPERATURA = None
+    
+def set_config(**params):
+    for k, v in params.items():
+        setattr(Config, k, v)
+
+def make_tag(idx: int) -> str:
+    return f"c{idx}_{Config.METODO_MELHORIA}"
 
 # =============================================================
 # MAIN
 # =============================================================
+def print_config_run(idx: int):
+    print(f"\nExecutando config {idx} | metodo: {Config.METODO_MELHORIA}")
 
 if __name__ == "__main__":
     limpar_pastas_saida()
-    if Config.EXECUTAR_TODOS:
-        executar_grasp_para_todos()
-    else:
-        executar_grasp()
+    configs = [
+        {
+            "CAMINHO_ARQUIVO": "aresta_residuo/arestas_residuo_gp1.txt",
+            "CAPACIDADE_CAMINHAO": 15000,
+            "ALFA": 0.6,
+            "NUM_ITERACOES_GRASP": 10,
+            "GERAR_HTML": False,
+            "GERAR_TXT": False,
+            "EXECUTAR_TODOS": True,
+            "NUM_TENTATIVAS_SWAP": 50,
+            "METODO_MELHORIA": "first_rand",
+            "SA_TEMPERATURA_INICIAL": 100,
+            "SA_TEMPERATURA_MIN": 0.01,
+            "SA_ALPHA": 0.8,
+            "SA_ITERACOES_POR_TEMPERATURA": 10,
+        },
+        {
+            "CAMINHO_ARQUIVO": "aresta_residuo/arestas_residuo_gp1.txt",
+            "CAPACIDADE_CAMINHAO": 15000,
+            "ALFA": 0.8,
+            "NUM_ITERACOES_GRASP": 20,
+            "GERAR_HTML": False,
+            "GERAR_TXT": False,
+            "EXECUTAR_TODOS": True,
+            "NUM_TENTATIVAS_SWAP": 100,
+            "METODO_MELHORIA": "annealing",
+            "SA_TEMPERATURA_INICIAL": 100,
+            "SA_TEMPERATURA_MIN": 0.01,
+            "SA_ALPHA": 0.8,
+            "SA_ITERACOES_POR_TEMPERATURA": 10,
+        },
+        {
+            "CAMINHO_ARQUIVO": "aresta_residuo/arestas_residuo_gp1.txt",
+            "CAPACIDADE_CAMINHAO": 15000,
+            "ALFA": 0.8,
+            "NUM_ITERACOES_GRASP": 20,
+            "GERAR_HTML": False,
+            "GERAR_TXT": False,
+            "EXECUTAR_TODOS": True,
+            "NUM_TENTATIVAS_SWAP": 100,
+            "METODO_MELHORIA": "best_first",
+            "SA_TEMPERATURA_INICIAL": 100,
+            "SA_TEMPERATURA_MIN": 0.01,
+            "SA_ALPHA": 0.8,
+            "SA_ITERACOES_POR_TEMPERATURA": 10,
+        }
+    ]
+
+    for idx, cfg in enumerate(configs, start=1):
+        set_config(**cfg)
+        Config.TAG = make_tag(idx)
+        print_config_run(idx)
+        if Config.EXECUTAR_TODOS:
+            executar_grasp_para_todos()
+        else:
+            executar_grasp()
