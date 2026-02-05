@@ -473,10 +473,17 @@ def executar_grasp():
     grafo, demandas = construir_grafo(df)
 
     carregar_fw("fw/" + fw_prefix_from_arquivo(Config.CAMINHO_ARQUIVO))
+    melhor = None
+    melhor_custo = float("inf")
+    
+    for _ in range(Config.NUM_ITERACOES_GRASP):
+        rotas = construir_solucao_grasp(
+            grafo, demandas, Config.ALFA, Config.CAPACIDADE_CAMINHAO
+        )
+        custo = sum(custo_aresta(grafo, u, v) for rota, _ in rotas for (u, v, _) in rota)
 
-    melhor = construir_solucao_grasp(
-        grafo, demandas, Config.ALFA, Config.CAPACIDADE_CAMINHAO
-    )
+        if custo < melhor_custo:
+            melhor, melhor_custo = rotas, custo
 
     tempo = time.time() - inicio
     
@@ -548,8 +555,8 @@ if __name__ == "__main__":
             "CAMINHO_ARQUIVO": "aresta_residuo/arestas_residuo_gp1.txt",
             "CAPACIDADE_CAMINHAO": 15000,
             "ALFA": 0.6,
-            "NUM_ITERACOES_GRASP": 10,
-            "GERAR_HTML": False,
+            "NUM_ITERACOES_GRASP": 5,
+            "GERAR_HTML": True,
             "GERAR_TXT": False,
             "EXECUTAR_TODOS": True,
             "NUM_TENTATIVAS_SWAP": 50,
@@ -563,8 +570,8 @@ if __name__ == "__main__":
             "CAMINHO_ARQUIVO": "aresta_residuo/arestas_residuo_gp1.txt",
             "CAPACIDADE_CAMINHAO": 15000,
             "ALFA": 0.8,
-            "NUM_ITERACOES_GRASP": 20,
-            "GERAR_HTML": False,
+            "NUM_ITERACOES_GRASP": 5,
+            "GERAR_HTML": True,
             "GERAR_TXT": False,
             "EXECUTAR_TODOS": True,
             "NUM_TENTATIVAS_SWAP": 100,
@@ -578,8 +585,8 @@ if __name__ == "__main__":
             "CAMINHO_ARQUIVO": "aresta_residuo/arestas_residuo_gp1.txt",
             "CAPACIDADE_CAMINHAO": 15000,
             "ALFA": 0.8,
-            "NUM_ITERACOES_GRASP": 20,
-            "GERAR_HTML": False,
+            "NUM_ITERACOES_GRASP": 5,
+            "GERAR_HTML": True,
             "GERAR_TXT": False,
             "EXECUTAR_TODOS": True,
             "NUM_TENTATIVAS_SWAP": 100,
